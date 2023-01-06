@@ -1,0 +1,130 @@
+---
+title: "Thorax"
+author: "George Boateng-Sarfo"
+date: "12/3/2021"
+output: html_document
+---
+
+```{r, message=FALSE}
+ThoraxcountsData = read.csv("Thorax.csv", header = 1)
+rownames(ThoraxcountsData) = ThoraxcountsData$Geneid
+ThoraxcountsData = ThoraxcountsData[, -1]
+head(ThoraxcountsData)
+```
+
+##Setting the 
+```{r, message=FALSE}
+ThoraxPheno = subset(PhenoData, PhenoData$Tissue %in% "T")
+ThoraxPheno = ThoraxPheno[,-1]
+Thoraxcoldata = ThoraxPheno[, 1]
+head(ThoraxPheno)
+```
+
+```{r, message=FALSE}
+head(Thorax_ColData)
+all(rownames(Thoraxcoldata) %in% colnames())
+head(ThoraxcountsData)
+```
+
+```{r, message=FALSE}
+Thorax_ColData = as.data.frame(cbind(colnames(ThoraxcountsData), Thoraxcoldata, ThoraxPheno))
+head(Thorax_ColData)
+```
+
+##Subsetting the data for Thorax
+
+
+```{r, message=FALSE}
+par(mar=c(8,4,4,1)+0.1)
+barplot(colSums(ThoraxcountsData)/1e6, las =3)
+```
+
+
+```{r, message=FALSE}
+library(DESeq2)
+Thorax_DDS = DESeqDataSetFromMatrix(countData = ThoraxcountsData, colData = Thorax_ColData,
+                                    design= ~Beecolony+Beecast+Beecast*Chill)
+Thorax_DDS = DESeq(Thorax_DDS)
+nrow(Thorax_DDS)
+```
+
+```{r, message=FALSE}
+head(Thorax_DDS)
+```
+
+```{r, message=FALSE}
+
+```
+
+```{r, message=FALSE}
+Thorax_rlg = rlog(Thorax_DDS)
+```
+
+
+```{r, message=FALSE}
+plotPCA(Thorax_rlg, intgroup =c("Thorax_colony", "Thorax_casts", "Thorax_Chill"))
+```
+
+
+```{r, message=FALSE}
+Thorax_res = results(Thorax_DDS)
+summary(Thorax_res)
+```
+
+
+```{r, message=FALSE}
+DESeq2::plotMA(Thorax_res, ylim=c(-5,5))
+```
+
+
+```{r, message=FALSE}
+library(dplyr)
+Thorax_vol<- as.data.frame(Thorax_res)
+Head_vol<- mutate(Thorax_vol, sig=ifelse(Thorax_res$padj<0.1, "FPR_Thorax < 0.1", "Not Sig"))
+Thorax_vol[which(abs(Thorax_res$log2FoldChange)<1.0), "sig"] = "Not sig"
+```
+
+
+```{r, message=FALSE}
+library(ggplot2)
+ggplot(Thorax_vol, aes(log2FoldChange, -log10(padj))) + geom_point(aes(col=sig)) + scale_color_manual(values = c("black", "red", "blue"))
+```
+
+
+```{r, message=FALSE}
+
+```
+
+
+```{r, message=FALSE}
+
+```
+
+```{r, message=FALSE}
+
+```
+
+```{r, message=FALSE}
+
+```
+
+```{r, message=FALSE}
+
+```
+
+```{r, message=FALSE}
+
+```
+
+```{r, message=FALSE}
+
+```
+
+```{r, message=FALSE}
+
+```
+
+
+```{r, message=FALSE}
+
+```

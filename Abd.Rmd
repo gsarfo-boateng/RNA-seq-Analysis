@@ -1,0 +1,192 @@
+---
+title: "Abd_DGE"
+author: "George Boateng-Sarfo"
+date: "12/1/2021"
+output: html_document
+---
+
+```{r}
+getwd()
+abdcountdata = read.table("Abd.txt", header = TRUE)
+rownames(abdcountdata) = abdcountdata$Geneid
+abdcountdata = abdcountdata[, -1]
+```
+
+```{r}
+PhenoData <- read.table("SamT.txt", header = TRUE)
+abdPheno = subset(PhenoData, PhenoData$Tissue %in% 'A')
+abdPheno$Chill <-factor(abdPheno$Chill)
+abdPheno$Beecast<-factor(abdPheno$Beecast)
+abdPheno$Beecolony<-factor(abdPheno$Beecolony)
+head(abdPheno)
+```
+
+```{r, message=FALSE}
+all(rownames(Sample_abdPheno) %in% colnames(abdcountdata))
+```
+
+```{r}
+colData_abd = as.data.frame(cbind(colnames(abdcountdata), Sample_abdPheno, abdPheno, Chill_treatment)) 
+```
+
+```{r, message=FALSE}
+
+```
+
+```{r}
+library(DESeq2)
+head(colData_abd)
+head(colData_abd)
+DDS_abd <- DESeqDataSetFromMatrix(countData = abdcountdata,
+                                  colData = colData_abd,
+                                  design = ~Beecast+Chill+Beecast*Chill)
+
+DDS_abd = DESeq(DDS_abd)
+nrow(DDS_abd)
+```
+
+```{r}
+par(mar=c(10,5,5,5)+0.8)
+barplot(colSums(abdcountdata)/1e6, las=3)
+```
+
+```{r}
+logabdcountData = log2(1+abdcountdata)
+hist(logabdcountData$X76A_3979_S9_L001, br=200)
+```
+
+```{r}
+plot(logabdcountData[,1], logabdcountData[,2])
+```
+
+```{r}
+plot(logabdcountData[,1], logabdcountData[,3])
+```
+
+```{r}
+DDS_abd <- DDS_abd[rowSums(counts(DDS_abd)) > 3,]
+nrow(DDS_abd)
+```
+
+
+```{r}
+sizeFactors(DDS_abd)
+```
+
+
+```{r}
+rld_abd <- rlog(DDS_abd)
+rld_abd
+plotPCA(rld_abd, intgroup = c("Chill_treatment","Beecasts_columns")) #c("Beecast","Chill", "Mate") Bee_colony+Beecasts_columns*Chill_treatment
+```
+
+
+```{r}
+detectGroups <- function(x_abd){
+  tem<- gsub("[0-9]*$", "", x_abd)
+  tem<- gsub("_$", "", tem):
+    tem<- gsub("Rep$","", tem):
+    tem<- gsub("_Rep$","", tem):
+    return(tem)
+}
+
+  dist2 <- function(x_abd, ...) # distance function = 1-PCC (Pearson's correlation coefficient)
+    {  
+  as.dist(1-cor(t(x_abd), method="pearson"))
+    }
+```
+
+
+```{r}
+library(gplots)
+hclustBombus<- function(x_abd, method="average", ...){
+  hclust(x_abd, method=method, ...)
+}
+n=100
+x_abd=assay(rld_abd)
+if(n>dim(x_abd)[1]) n = dim(x_abd)[1] # max	as data
+
+x_abd = x_abd[order(apply(x_abd,1,sd),decreasing=TRUE),]  # sort genes by standard deviation
+
+x_abd = x_abd[1:n,]   # only keep the n genes
+
+# this will cutoff very large values, which could skew the color 
+x_abd=as.matrix(x_abd[1:n,])-apply(x_abd[1:n,],1,mean)
+cutoff = median(unlist(x_abd)) + 4*sd (unlist(x_abd)) 
+x_abd[x_abd>cutoff] <- cutoff
+cutoff = median(unlist(x_abd)) - 4*sd (unlist(x_abd)) 
+x_abd[x_abd< cutoff] <- cutoff
+	
+groups = detectGroups(colnames(x_abd))
+groups.colors = rainbow(length(unique(groups)))
+
+	lmat = rbind(c(5,4),c(0,1),c(3,2))
+	lwid = c(1.5,4)
+	lhei = c(1,.2,4)
+
+
+heatmap.2(x_abd, distfun = dist2, hclustfun=hclust,
+          col=greenred(75), density.info="none", trace="none", scale="none", keysize=.5,
+          key=T, symkey=F,
+          ColSideColors=groups.colors[ as.factor(groups)], 
+          margins=c(5,8),
+          cexRow=1,
+          srtCol=45,
+          cexCol=1,
+          lmat = lmat, lwid = lwid, lhei = lhei
+          )  # size of font for sample names
+```
+
+
+```{r}
+resultsNames(DDS_abd)
+head(res_abd)
+summary(res_abd)
+```
+
+
+```{r}
+res_abd = results(DDS_abd, lfcThreshold = 0.01)
+```
+
+
+```{r}
+DESeq2::plotMA(res_abd, ylim=c(-5,5))
+```
+
+```{r}
+library(dplyr)
+Abd<- as.data.frame(res_abd)
+Abd<- mutate(Abd, sig=ifelse(res_abd$padj<0.1, "FDR<0.1", "Not Sig"))
+Abd[which(abs(Abd$log2FoldChange)<1.0), "sig"] = "Not sig"
+```
+
+```{r}
+library(ggplot2)
+ggplot(Abd, aes(log2FoldChange, -log10(padj))) + geom_point(aes(col=sig)) + scale_color_manual(values = c("blue", "red", "green"))
+```
+
+```{r}
+resBombus <- resBombus[order(abs(res$log2FoldChange), decreasing = TRUE),]
+TopGene = rownames(resBombus)[1]
+plotCounts(DDS, gene = TopGene, intgroup = "Tissue")
+```
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```

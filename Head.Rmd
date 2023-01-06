@@ -1,0 +1,136 @@
+---
+title: "head_DGE"
+author: "George Boateng-Sarfo"
+date: "12/3/2021"
+output:
+  html_document: default
+  word_document: default
+---
+##Reading in the HeadcountsData
+```{r, message=FALSE}
+countsData = read.csv("Head.csv", header = TRUE)
+Pheno = read.table("SamT.txt", header = 1)
+HeadPheno = subset(Pheno, Pheno$Tissue %in% "H")
+rownames(countsData) = countsData$Geneid
+countsData = countsData[, -1]
+rownames(HeadPheno) = HeadPheno$Sample_IDs
+HeadPheno = HeadPheno[, -1]
+head(countsData)
+```
+
+##Get the Phenotypic data
+```{r, message=FALSE}
+countsData = countsData[, rownames(HeadPheno)]
+```
+
+##Setting treatment for colData
+```{r, message=FALSE}
+HeadPheno$Beecast = factor(HeadPheno$Beecast)
+HeadPheno$Chill = factor(HeadPheno$Chill)
+HeadPheno$Beecolony = factor(HeadPheno$Beecolony)
+```
+
+```{r, message=FALSE}
+all(rownames(HeadPheno) %in% colnames(countsData))
+all(rownames(HeadPheno) == colnames(countsData))
+```
+
+##ColData for DESeq2
+```{r, message=FALSE}
+
+```
+
+##DESeq2 design 
+```{r}
+library(DESeq2)
+Head_DDS = DESeqDataSetFromMatrix(countData = countsData, 
+                                  colData = HeadPheno,
+                                  design = ~Beecast+Chill+Beecast*Chill)
+Head_DES = DESeq(Head_DDS)
+head(Head_DES)
+```
+##Applying Regularized Transfirmation on the Head_DES
+```{r}
+rlg_Head = rlog(Head_DES)
+head(rlg_Head)
+```
+
+##PCA to show the observed variation
+```{r}
+plotPCA(rlg_Head, intgroup = c("Beecast", "Chill"))
+```
+
+```{r}
+resultsNames(Head_DES)
+```
+
+
+```{r}
+res_Head = results(Head_DES)
+(resOrdered <- res_Head[order(res_Head$padj), ])
+summary(res_Head)
+```
+
+
+```{r}
+DESeq2::plotMA(res_Head, ylim=c(-5,5))
+```
+
+
+```{r}
+library(dplyr)
+Head_vol<- as.data.frame(res_Head)
+Head_vol<- mutate(Head_vol, sig=ifelse(res_Head$padj<0.1, "FDR<0.1", "Not Sig"))
+Head_vol[which(abs(Head_vol$log2FoldChange)<1.0), "sig"] = "sig"
+```
+
+
+```{r}
+library(ggplot2)
+ggplot(Head_vol, aes(log2FoldChange, -log10(padj))) + geom_point(aes(col=sig)) + scale_color_manual(values = c("black", "red", "blue"))
+```
+
+
+```{r}
+res_Head <- res_Head[order(abs(res_Head$log2FoldChange), decreasing = TRUE),]
+Head_TopGene = rownames(res_Head)[1]
+```
+
+
+```{r}
+plotCounts(Head_DES, gene = Head_TopGene, intgroup = "Chill")
+```
+
+
+
+```{r}
+res = results(Head_DES, name = "Chill_2_vs_1")
+```
+
+```{r}
+res1<-results(Head_DES, name="Beecast2.Chill2")
+summary(res1)
+```
+
+
+```{r}
+res2 = results(Head_DES, name = "Beecast_2_vs_1")
+summary(res2)
+```
+
+
+```{r}
+DESeq2::plotMA(res2, ylim=c(-5,5))
+```
+
+
+```{r}
+#Head_vol<- as.data.frame(res2)
+#Head_vol<- mutate(res2, sig=ifelse(res2$padj<0.1, "FPR_Head<0.1", "Not Sig"))
+#Head_vol[which(abs(res2$log2FoldChange)<1.0), "sig"] = "sig"
+```
+```
+
+```{r}
+
+```
