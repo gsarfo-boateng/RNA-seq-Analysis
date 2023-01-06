@@ -1,0 +1,564 @@
+---
+title: "Bombus Diff_GEA"
+author: "George Boateng-Sarfo"
+date: "11/17/2021"
+output: html_document
+---
+
+```{r}
+BiocManager::install(c("lima", "DESeq2", "AnnotationDbi", "ReportingTools", "GO.db", "GOstats", "pathview", "gage", "gageData", "select"))
+```
+
+##Relevant libraries
+```{r}
+getwd()
+library(DESeq2)
+library(dplyr)
+```
+
+##Get the Countdata
+```{r}
+getwd()
+countData <- read.table("Bombus.txt", header = TRUE)
+rownames(countData) = countData$Geneid
+countData = countData[, -1]
+head(countData)
+```
+
+##Phenotypic data
+```{r}
+PhenoData <- read.table("SamT.txt", header = TRUE)
+columns = PhenoData$Sample_IDs
+Treatment = PhenoData[, -1]
+Treatment1= Treatment$Beecast
+Treatment2 = Treatment$Chill
+Treatment3 = Treatment$Beecolony
+Treatment4 = Treatment$Tissue
+Total_treatment = c(Treatment1, Treatment2, Treatment3, Treatment4)
+colnames(countData) = columns
+```
+
+```{r}
+Whole_colData = as.data.frame(cbind(colnames(countData), Treatment))
+nrow(Whole_colData)
+ncol(Whole_colData)
+```
+
+```{r}
+par(mar=c(8,4,4,1)+0.1)
+barplot(colSums(countData)/1e06, las =3)
+```
+```{r}
+logcountData = log2(1+countData)
+```
+
+
+```{r}
+hist(logcountData$X90T_3979_S23_L001, br=100)
+```
+
+```{r}
+plot(logcountData[,1], logcountData[,2])
+```
+
+```{r}
+DDS_whole = DESeqDataSetFromMatrix(countData = countData, colData = Whole_colData, design = ~Beecast+Mate+Chill+Beecast*Chill)
+```
+
+```{r}
+DDS_F = DESeq(DDS_whole)
+nrow(DDS_F)
+```
+
+```{r}
+rld_Whole <- rlog(DDS_F)
+ rld_abd
+plotPCA(rld_Whole)
+```
+
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+
+```{r}
+DDS_abd<- DDS_abd[rowSums(counts(DDS_abd))> 5,]
+nrow(DDS_abd)
+```
+
+```{r}
+sizeFactors(DDS_abd)
+```
+
+```{r}
+
+```
+
+
+```{r}
+detectGroups <- function(x_abd){
+  tem<- gsub("[0-9]*$", "", x_abd)
+  tem<- gsub("_$", "", tem):
+    tem<- gsub("Rep$","", tem):
+    tem<- gsub("_Rep$","", tem):
+    return(tem)
+}
+
+  dist2 <- function(x_abd, ...) # distance function = 1-PCC (Pearson's correlation coefficient)
+    {  
+  as.dist(1-cor(t(x_abd), method="pearson"))
+    }
+```
+
+```{r}
+library(gplots)
+hclustBombus<- function(x_abd, method="average", ...){
+  hclust(x_abd, method=method, ...)
+}
+n=30
+x_abd=assay(rld_abd)
+if(n>dim(x_abd)[1]) n = dim(x_abd)[1] # max	as data
+
+x_abd = x_abd[order(apply(x_abd,1,sd),decreasing=TRUE),]  # sort genes by standard deviation
+
+x_abd = x_abd[1:n,]   # only keep the n genes
+
+# this will cutoff very large values, which could skew the color 
+x_abd=as.matrix(x_abd[1:n,])-apply(x_abd[1:n,],1,mean)
+cutoff = median(unlist(x_abd)) + 4*sd (unlist(x_abd)) 
+x_abd[x_abd>cutoff] <- cutoff
+cutoff = median(unlist(x_abd)) - 4*sd (unlist(x_abd)) 
+x_abd[x_abd< cutoff] <- cutoff
+	
+groups = detectGroups(colnames(x_abd))
+groups.colors = rainbow(length(unique(groups)))
+
+	lmat = rbind(c(5,4),c(0,1),c(3,2))
+	lwid = c(1.5,4)
+	lhei = c(1,.2,4)
+
+
+heatmap.2(x_Head, distfun = dist2, hclustfun=hclust,
+          col=greenred(75), density.info="none", trace="none", scale="none", keysize=.5,
+          key=T, symkey=F,
+          ColSideColors=groups.colors[ as.factor(groups)], 
+          margins=c(5,8),
+          cexRow=1,
+          srtCol=45,
+          cexCol=1,
+          lmat = lmat, lwid = lwid, lhei = lhei
+          )  # size of font for sample names
+```
+
+```{r}
+res_abd <- results(DDS_abd)
+head(res_abd)
+```
+
+```{r}
+res_abd = results(DDS_abd, lfcThreshold = 0.1)
+```
+
+
+```{r}
+DESeq2::plotMA(res_abd)
+```
+
+
+```{r}
+library(dplyr)
+Abd<- as.data.frame(res_abd)
+Abd<- mutate(Abd, sig=ifelse(res_abd$padj<0.1, "FDR<0.1", "Not Sig"))
+Abd[which(abs(Abd$log2FoldChange)<1.0), "sig"] = "Not sig"
+```
+
+
+```{r}
+library(ggplot2)
+ggplot(Abd, aes(log2FoldChange, -log10(padj))) + geom_point(aes(col=sig)) + scale_color_manual(values = c("blue", "red", "green"))
+```
+
+##Subsetting HeadcountData
+```{r}
+HeadPheno = subset(PhenoData,  PhenoData$Tissue %in% 'H')
+Headcountdata = read.csv("Head.csv", header = TRUE)
+rownames(Headcountdata) = Headcountdata$Geneid
+Headcountdata = Headcountdata[, -1]
+```
+
+```{r}
+columns = HeadPheno$Geneid
+colnames(Headcountdata) = columns
+```
+
+
+```{r}
+Head_colData = as.data.frame(cbind(colnames(Headcountdata), HeadPheno)) 
+Head_colData = Head_colData[, -2] 
+nrow(Head_colData)
+```
+
+
+```{r}
+Head_DDS <- DESeqDataSetFromMatrix(countData = Headcountdata,
+                              colData = Head_colData,
+                              design = ~Beecolony+Beecast+Chill+Beecast:Chill)
+Head_DDS = DESeq(Head_DDS)
+nrow(Head_DDS)
+```
+
+
+```{r}
+par(mar=c(10,5,5,5)+0.2)
+barplot(colSums(Headcountdata)/1e2, las=3)
+```
+
+```{r}
+Head_DDS<- Head_DDS[rowSums(counts(Head_DDS))> 5,]
+nrow(Head_DDS)
+```
+
+```{r}
+sizeFactors(Head_DDS)
+```
+
+```{r}
+rld_Head <- rlog(Head_DDS)
+plotPCA(rld_Head, intgroup = c("Beecolony","Beecast","Chill"))
+```
+
+```{r}
+detectGroups <- function(Head_x){
+  tem<- gsub("[0-9]*$", "", Head_x)
+  tem<- gsub("_$", "", tem):
+    tem<- gsub("Rep$","", tem):
+    tem<- gsub("_Rep$","", tem):
+    return(tem)
+}
+
+  dist2 <- function(Head_x, ...) # distance function = 1-PCC (Pearson's correlation coefficient)
+    {  
+  as.dist(1-cor(t(Head_x), method="pearson"))
+    }
+```
+
+```{r}
+library(gplots)
+hclustHead <- function(Head_x, method="average", ...){
+  hclust(Head_x, method=method, ...)
+}
+n=36
+Head_x=assay(rld_Head)
+if(n>dim(Head_x)[1]) n = dim(Head_x)[1] # max	as data
+
+Head_x = Head_x[order(apply(Head_x,1,sd),decreasing=TRUE),]  # sort genes by standard deviation
+
+Head_x = Head_x[1:n,]   # only keep the n genes
+
+# this will cutoff very large values, which could skew the color 
+Head_x=as.matrix(Head_x[1:n,])-apply(Head_x[1:n,],1,mean)
+cutoff = median(unlist(Head_x)) + 4*sd (unlist(Head_x)) 
+Head_x[Head_x>cutoff] <- cutoff
+cutoff = median(unlist(Head_x)) - 4*sd (unlist(Head_x)) 
+Head_x[Head_x< cutoff] <- cutoff
+	
+groups = detectGroups(colnames(Head_x))
+groups.colors = rainbow(length(unique(groups)))
+
+	Head_lmat = rbind(c(5,4),c(0,1),c(3,2))
+	Head_lwid = c(1.5,4)
+	Head_lhei = c(1,.2,4)
+
+
+heatmap.2(Head_x, distfun = dist2, hclustfun=hclustHead,
+          col=greenred(75), density.info="none", trace="none", scale="none", keysize=.5,
+          key=T, symkey=F,
+          ColSideColors=groups.colors[ as.factor(groups)], 
+          margins=c(5,8),
+          cexRow=1,
+          srtCol=45,
+          cexCol=1,
+          lmat = Head_lmat, Head_lwid = Head_lwid, Head_lhei = lhei
+          )  # size of font for sample names
+```
+
+```{r}
+resultsNames(Head_DDS)
+```
+
+```{r}
+res_Head<- results(Head_DDS)
+head(res_Head)
+```
+
+```{r}
+res_Head = results(Head_DDS, lfcThreshold = 0.1)
+```
+
+```{r}
+DESeq2::plotMA(res_Head)
+```
+
+```{r}
+Head_res1<- as.data.frame(res_Head)
+Head_res1<- mutate(Head_res1, sig=ifelse(res_Head$padj<0.1, "FDR<0.1", "Not Sig"))
+Head_res1[which(abs(Head_res1$log2FoldChange)<1.0), "sig"] = "Not sig"
+```
+
+
+```{r}
+ggplot(Head_res1, aes(log2FoldChange, -log10(padj))) + geom_point(aes(col=sig)) + scale_color_manual(values = c("blue", "red", "green"))
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+##Treatment Setup
+```{r}
+colData = as.data.frame(cbind(colnames(countData), PhenoData)) 
+colData = colData[, -2] 
+```
+
+
+##Setup to DESEq2
+```{r}
+DDS <- DESeqDataSetFromMatrix(countData = countData,
+                              colData = colData,
+                              design = ~Beecolony+Beecast+Chill+Beecast:Chill)
+DDS = DESeq(DDS)
+nrow(DDS)
+
+```
+
+##Plots for count reads
+```{r}
+par(mar=c(10,5,5,5)+0.2)
+barplot(colSums(countData)/1e2, las=3)
+```
+
+```{r}
+logcountData = log2(1+countData)
+hist(countData$X10A_3979_S3_L001, br=50)
+```
+
+```{r}
+plot(logcountData[,1], logcountData[,2])
+```
+
+```{r}
+plot(logcountData[,2], logcountData[,3])
+```
+
+```{r}
+plot(logcountData[,3], logcountData[,4])
+```
+
+```{r}
+DDS<- DDS[rowSums(counts(DDS))> 5,]
+nrow(DDS)
+```
+
+```{r}
+sizeFactors(DDS)
+```
+
+##To explain the most variance between the samples
+```{r}
+library(ggplot2)
+rld <- rlog(DDS)
+plotPCA(rld, intgroup = c("Beecolony","Beecast","Chill")) #Beecolony+Beecast+Chill+Beecast:Chill
+```
+
+#Calculate similarity of gene expression the distance between gene
+```{r}
+#colnames(countData)
+#detectGroup(colnames(countData))
+detectGroups <- function(x){
+  tem<- gsub("[0-9]*$", "", x)
+  tem<- gsub("_$", "", tem):
+    tem<- gsub("Rep$","", tem):
+    tem<- gsub("_Rep$","", tem):
+    return(tem)
+}
+
+  dist2 <- function(x, ...) # distance function = 1-PCC (Pearson's correlation coefficient)
+    {  
+  as.dist(1-cor(t(x), method="pearson"))
+    }
+```
+
+```{r}
+library(gplots)
+hclustBombus<- function(x, method="average", ...){
+  hclust(x, method=method, ...)
+}
+n=200
+x=assay(rld)
+if(n>dim(x)[1]) n = dim(x)[1] # max	as data
+
+x = x[order(apply(x,1,sd),decreasing=TRUE),]  # sort genes by standard deviation
+
+x = x[1:n,]   # only keep the n genes
+
+# this will cutoff very large values, which could skew the color 
+x=as.matrix(x[1:n,])-apply(x[1:n,],1,mean)
+cutoff = median(unlist(x)) + 4*sd (unlist(x)) 
+x[x>cutoff] <- cutoff
+cutoff = median(unlist(x)) - 4*sd (unlist(x)) 
+x[x< cutoff] <- cutoff
+	
+groups = detectGroups(colnames(x))
+groups.colors = rainbow(length(unique(groups)))
+
+	lmat = rbind(c(5,4),c(0,1),c(3,2))
+	lwid = c(1.5,4)
+	lhei = c(1,.2,4)
+
+
+heatmap.2(x, distfun = dist2, hclustfun=hclust,
+          col=greenred(75), density.info="none", trace="none", scale="none", keysize=.5,
+          key=T, symkey=F,
+          ColSideColors=groups.colors[ as.factor(groups)], 
+          margins=c(5,8),
+          cexRow=1,
+          srtCol=45,
+          cexCol=1,
+          lmat = lmat, lwid = lwid, lhei = lhei
+          )  # size of font for sample names
+```
+
+#To generate the logfoldchange 
+```{r}
+resultsNames(DDS)
+```
+
+
+```{r}
+resBombus<- results(DDS)
+head(resBombus)
+```
+
+```{r}
+res = results(DDS, lfcThreshold = 0.1)
+```
+#Plot the relationship between the log foldchange of genes and number of normalised reads (Sig genes)
+```{r}
+DESeq2::plotMA(res)
+```
+
+Volcano_Plot 
+```{r}
+library(dplyr)
+Bombres1<- as.data.frame(res)
+Bombres1<- mutate(Bombres1, sig=ifelse(res$padj<0.1, "FDR<0.1", "Not Sig"))
+Bombres1[which(abs(Bombres1$log2FoldChange)<1.0), "sig"] = "Not sig"
+```
+
+```{r}
+library(ggplot2)
+ggplot(Bombres1, aes(log2FoldChange, -log10(padj))) + geom_point(aes(col=sig)) + scale_color_manual(values = c("blue", "red", "green"))
+```
+
+Gene that have the highest foldchange
+```{r}
+resBombus <- resBombus[order(abs(res$log2FoldChange), decreasing = TRUE),]
+TopGene = rownames(resBombus)[1]
+plotCounts(DDS, gene = TopGene, intgroup = "Tissue")
+#plotCounts(DDS, gene = TopGene, intgroup = c("Beecolony","Beecast","Mate","Chill","Tissue")
+#type(PhenoData)
+```
+
+
+Identity gene of interest 
+```{r}
+library(AnnotationDbi)
+#library(org.Hs.eg.db)# get one for Bombus
+#library(org.Mm.eg.db)
+```
+
+```{r}
+#resBombus$refseq = gsub("\\..*","", row.names(resBombus1))
+```
+
+
+Mapping the gene symbol
+```{r}
+#columns(org.Mm.eg.db)
+resBombus$SYMBOL =mapIds(org.Mm.eg.db,
+                         keys = ref$refseq,
+                         column = "SYMBOL",
+                         keytype = "REFSEQ",
+                         multiVals = "First")
+resBombus$ENTREZ = mapIds(org.Mm.eg.db,
+                          key= resBombus$refseq,
+                          column = "ENTREZID",
+                          keytype = "REFSEQ",
+                          multiVals = "first"
+                          )
+head(resBombus)
+```
+Save Rscript to csv
+```{r}
+write.csv(resBombus, file = "BombresSignificant-0.1_lcf_result.csv")
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
